@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetGuard AI - Predictive Fleet Telemetry & Machine Intelligence</title>
+  <meta name="description" content="AI-Powered predictive maintenance platform mapping vehicle telemetry to industrial failure physics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">FleetGuard <span class="accent-text">AI</span></span>
+          <span class="brand-tagline">Predictive Maintenance & Fleet Telemetry Engine</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="status-pill" id="modelStatusPill">
+          <span class="pulse-dot"></span>
+          <span id="modelStatusText">ML Engine Active</span>
+        </div>
+        
+        <div class="mode-toggle-group">
+          <label class="toggle-label" for="mockModeSwitch">Mock Fallback</label>
+          <label class="switch">
+            <input type="checkbox" id="mockModeSwitch">
+            <span class="slider round"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Domain Disclaimer Banner -->
+  <aside class="disclaimer-banner" role="alert">
+    <div class="disclaimer-content">
+      <div class="disclaimer-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="disclaimer-text">
+        <strong>Domain Validation Note:</strong> The ML classifier is trained on the UCI AI4I 2020 dataset (industrial milling machine physics). Telemetry signals are mapped into surrogate feature representations. Cross-validation results demonstrate predictive capability on degradation patterns, but do not substitute for real-world commercial vehicle CAN bus certification.
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Application Container -->
+  <main class="main-layout">
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" aria-label="Dashboard Views">
+      <button class="tab-btn active" data-tab="telemetryTab" id="btnTabTelemetry">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Live Telemetry & Diagnostics
+      </button>
+      <button class="tab-btn" data-tab="timeseriesTab" id="btnTabTimeSeries">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        Time Series Degradation Analytics
+      </button>
+      <button class="tab-btn" data-tab="fleetTab" id="btnTabFleet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+        Active Fleet Monitor (<span id="fleetCountBadge">8</span>)
+      </button>
+      <button class="tab-btn" data-tab="metricsTab" id="btnTabMetrics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        Model Card & 5-Fold CV
+      </button>
+    </nav>
+
+    <!-- TAB 1: Live Telemetry & Diagnostics -->
+    <section class="tab-pane active" id="telemetryTab">
+      <div class="grid-2col">
+        <!-- Telemetry Controls & Sliders -->
+        <div class="card control-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Vehicle Telemetry Input</h2>
+              <p class="card-subtitle">Adjust real-time sensor parameters to test predictive maintenance response</p>
+            </div>
+            <!-- Preset Buttons -->
+            <div class="preset-dropdown">
+              <span class="preset-label">Simulation Presets:</span>
+              <div class="preset-pills">
+                <button class="pill-btn active" data-preset="normal">Normal Cruise</button>
+                <button class="pill-btn" data-preset="overheat">Heat Dissipation</button>
+                <button class="pill-btn" data-preset="power_spike">Power Failure</button>
+                <button class="pill-btn" data-preset="overstrain">Overstrain Strain</button>
+                <button class="pill-btn" data-preset="heavy_wear">Severe Wear</button>
+                <button class="pill-btn" data-preset="out_of_range">Out of Range</button>
+              </div>
+            </div>
+          </div>
+
+          <form id="telemetryForm" class="control-grid">
+            <!-- Vehicle Duty Type -->
+            <div class="input-group full-width">
+              <label for="dutyType">Vehicle Duty Class (AI4I Type)</label>
+              <div class="radio-toggle-group">
+                <label class="radio-option">
+                  <input type="radio" name="vehicle_duty_type" value="light">
+                  <span>Light Duty (L - 50%)</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="vehicle_duty_type" value="medium" checked>
+                  <span>Medium Duty (M - 30%)</span>
+                </label>
+                <label class="radio-option">
+                  <input type="radio" name="vehicle_duty_type" value="heavy">
+                  <span>Heavy Duty (H - 20%)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Ambient Temperature -->
+            <div class="input-group">
+              <div class="label-row">
+                <label for="ambientTemp">Ambient Temperature</label>
+                <span class="unit-val"><span id="valAmbient">25.0</span> °C &nbsp;<span class="kelvin-equiv">(298.15 K)</span></span>
+              </div>
+              <input type="range" id="ambientTemp" name="ambient_temp_c" min="15" max="45" step="0.5" value="25.0">
+              <span class="range-hint">Supported: 21.8°C to 31.3°C (295K - 304.5K)</span>
+            </div>
+
+            <!-- Coolant / Process Temperature -->
+            <div class="input-group">
+              <div class="label-row">
+                <label for="coolantTemp">Coolant / Process Temp</label>
+                <span class="unit-val"><span id="valCoolant">35.5</span> °C &nbsp;<span class="kelvin-equiv">(308.65 K)</span></span>
+              </div>
+              <input type="range" id="coolantTemp" name="coolant_temp_c" min="25" max="65" step="0.5" value="35.5">
+              <span class="range-hint">Supported: 32.5°C to 40.6°C (305.7K - 313.8K)</span>
+            </div>
+
+            <!-- Engine RPM / Rotational Speed -->
+            <div class="input-group">
+              <div class="label-row">
+                <label for="engineRpm">Engine Speed</label>
+                <span class="unit-val"><span id="valRpm">1550</span> RPM</span>
+              </div>
+              <input type="range" id="engineRpm" name="engine_rpm" min="800" max="3500" step="25" value="1550">
+              <span class="range-hint">Supported: 1168 to 2886 RPM</span>
+            </div>
+
+            <!-- Engine Torque -->
+            <div class="input-group">
+              <div class="label-row">
+                <label for="engineTorque">Engine Torque</label>
+                <span class="unit-val"><span id="valTorque">42.0</span> N·m</span>
+              </div>
+              <input type="range" id="engineTorque" name="engine_torque_nm" min="0" max="100" step="0.5" value="42.0">
+              <span class="range-hint">Supported: 3.8 to 76.6 N·m</span>
+            </div>
+
+            <!-- Accumulated Operating Wear / Hours -->
+            <div class="input-group full-width">
+              <div class="label-row">
+                <label for="operatingWear">Accumulated Component Wear</label>
+                <span class="unit-val"><span id="valWear">45</span> min &nbsp;<span class="kelvin-equiv">(0.75 hrs)</span></span>
+              </div>
+              <input type="range" id="operatingWear" name="operating_wear_min" min="0" max="300" step="1" value="45">
+              <span class="range-hint">Supported: 0 to 253 minutes tool wear</span>
+            </div>
+          </form>
+
+          <!-- Derived Physics Readout -->
+          <div class="derived-physics-panel">
+            <h3 class="panel-subtitle">Real-Time Physics Feature Extraction</h3>
+            <div class="physics-grid">
+              <div class="physics-card">
+                <span class="p-label">Δ Temp (Process - Air)</span>
+                <span class="p-value" id="calcTempDiff">10.50 K</span>
+                <span class="p-sub" id="hdfRiskNote">Normal (&gt; 8.6 K)</span>
+              </div>
+              <div class="physics-card">
+                <span class="p-label">Calculated Power</span>
+                <span class="p-value" id="calcPower">6.82 kW</span>
+                <span class="p-sub" id="pwfRiskNote">Normal (3.5 - 9.0 kW)</span>
+              </div>
+              <div class="physics-card">
+                <span class="p-label">Torque × Wear Product</span>
+                <span class="p-value" id="calcOverstrain">1,890 N·m·min</span>
+                <span class="p-sub" id="osfRiskNote">Normal (&lt; 11,000)</span>
+              </div>
+              <div class="physics-card">
+                <span class="p-label">Torque / Speed Ratio</span>
+                <span class="p-value" id="calcRatio">0.0271</span>
+                <span class="p-sub">Nominal Load</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Prediction Result Output Card -->
+        <div class="card result-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Predictive Maintenance Diagnosis</h2>
+              <p class="card-subtitle">Inference output from calibrated failure classifier</p>
+            </div>
+            <div class="range-badge" id="rangeStatusBadge">
+              <span class="badge-icon">✓</span>
+              <span id="rangeBadgeText">Inputs In-Range</span>
+            </div>
+          </div>
+
+          <!-- Probability Dial & Risk Tier -->
+          <div class="prediction-hero">
+            <div class="gauge-container">
+              <svg class="gauge-svg" viewBox="0 0 160 160">
+                <circle class="gauge-bg" cx="80" cy="80" r="65"></circle>
+                <circle class="gauge-progress" id="gaugeProgress" cx="80" cy="80" r="65" stroke-dasharray="408.4" stroke-dashoffset="380"></circle>
+              </svg>
+              <div class="gauge-center-text">
+                <span class="gauge-percent" id="probPercent">2.4%</span>
+                <span class="gauge-label">Failure Probability</span>
+              </div>
+            </div>
+
+            <div class="risk-info">
+              <div class="risk-tier-pill low" id="riskTierPill">
+                <span class="risk-dot"></span>
+                <span id="riskTierText">LOW RISK</span>
+              </div>
+              <p class="risk-desc" id="riskSummaryText">
+                Nominal vehicle operating profile. Sensor measurements conform to expected degradation envelopes.
+              </p>
+              <div class="decision-box" id="decisionBox">
+                <span class="decision-label">Recommended Fleet Action:</span>
+                <span class="decision-action" id="decisionActionText">Standard Routine Scheduled Maintenance</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Out of Range Warnings Container -->
+          <div class="warning-container hidden" id="outOfRangeContainer">
+            <div class="warning-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              Operational Boundary Violation (<span id="modelInRangeText">model_in_range = false</span>)
+            </div>
+            <ul class="warning-list" id="warningList">
+              <!-- Dynamically populated -->
+            </ul>
+          </div>
+
+          <!-- Feature Contribution Breakdown -->
+          <div class="feature-breakdown-panel">
+            <h3 class="panel-subtitle">Key Contributing Risk Factors</h3>
+            <div class="factor-bars" id="factorBars">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: Active Fleet Monitor -->
+    <section class="tab-pane" id="fleetTab">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Commercial Fleet Real-Time Health Monitor</h2>
+            <p class="card-subtitle">Active simulated vehicle telemetry streams with instant AI4I diagnostic inference</p>
+          </div>
+          <div class="fleet-filter-group">
+            <button class="filter-btn active" data-filter="all">All (8)</button>
+            <button class="filter-btn" data-filter="CRITICAL">Critical (1)</button>
+            <button class="filter-btn" data-filter="HIGH">High Risk (2)</button>
+            <button class="filter-btn" data-filter="LOW">Nominal (5)</button>
+          </div>
+        </div>
+
+        <div class="fleet-grid" id="fleetGrid">
+          <!-- Dynamically populated vehicle cards -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: Model Card & Cross-Validation Metrics -->
+    <section class="tab-pane" id="metricsTab">
+      <div class="grid-2col">
+        <!-- 5-Fold CV Performance Card -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Stratified 5-Fold Cross-Validation</h2>
+              <p class="card-subtitle">Evaluated on UCI AI4I 2020 Dataset (10,000 Out-of-Fold Samples)</p>
+            </div>
+            <span class="tag-pill">Seed: 42</span>
+          </div>
+
+          <div class="metrics-stat-grid">
+            <div class="stat-box">
+              <span class="stat-num" id="metricAccuracy">98.60%</span>
+              <span class="stat-name">Accuracy</span>
+              <span class="stat-std">±0.31%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num" id="metricPrecision">77.41%</span>
+              <span class="stat-name">Precision</span>
+              <span class="stat-std">±7.22%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num" id="metricRecall">84.66%</span>
+              <span class="stat-name">Recall</span>
+              <span class="stat-std">±2.72%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num" id="metricF1">80.58%</span>
+              <span class="stat-name">F1-Score</span>
+              <span class="stat-std">±3.04%</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num" id="metricRocAuc">0.9820</span>
+              <span class="stat-name">ROC-AUC</span>
+              <span class="stat-std">±0.0051</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-num" id="metricPrAuc">0.8841</span>
+              <span class="stat-name">PR-AUC</span>
+              <span class="stat-std">±0.0124</span>
+            </div>
+          </div>
+
+          <div class="cm-section">
+            <h3 class="panel-subtitle">Aggregate Confusion Matrix (10,000 Samples)</h3>
+            <div class="confusion-matrix-grid">
+              <div class="cm-cell header-cell"></div>
+              <div class="cm-cell header-cell">Pred: Normal</div>
+              <div class="cm-cell header-cell">Pred: Failure</div>
+              
+              <div class="cm-cell header-cell">Actual: Normal</div>
+              <div class="cm-cell tn-cell">
+                <span class="cm-val" id="cmTn">9,573</span>
+                <span class="cm-lbl">True Negative</span>
+              </div>
+              <div class="cm-cell fp-cell">
+                <span class="cm-val" id="cmFp">88</span>
+                <span class="cm-lbl">False Positive</span>
+              </div>
+
+              <div class="cm-cell header-cell">Actual: Failure</div>
+              <div class="cm-cell fn-cell">
+                <span class="cm-val" id="cmFn">52</span>
+                <span class="cm-lbl">False Negative</span>
+              </div>
+              <div class="cm-cell tp-cell">
+                <span class="cm-val" id="cmTp">287</span>
+                <span class="cm-lbl">True Positive</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Feature Importances & Model Card Info -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Random Forest Feature Contributions</h2>
+              <p class="card-subtitle">Physics-derived feature ranking and leakage prevention</p>
+            </div>
+          </div>
+
+          <div class="importance-list" id="importanceList">
+            <!-- Dynamically populated -->
+          </div>
+
+    <!-- TAB 4: Time Series Degradation Analytics -->
+    <section class="tab-pane" id="timeseriesTab">
+      <div class="timeseries-container">
+        <!-- Control Header & Scenario Selection -->
+        <div class="card ts-header-card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Temporal Fleet Telemetry & Degradation Progression</h2>
+              <p class="card-subtitle">Visualizing multi-step sensor evolution from healthy baseline to abnormal failure state</p>
+            </div>
+            <div class="ts-selectors-group">
+              <div class="ts-select-box">
+                <label for="tsScenarioSelect">Degradation Scenario:</label>
+                <select id="tsScenarioSelect" class="custom-select">
+                  <option value="heat_dissipation">Thermal Overheat & Heat Dissipation (HDF)</option>
+                  <option value="overstrain">Mechanical Overstrain & Critical Wear (OSF)</option>
+                  <option value="power_spike">Drivetrain Surge & Power Failure (PWF)</option>
+                  <option value="normal_cruise">Nominal Long-Haul Cruise (Healthy)</option>
+                </select>
+              </div>
+
+              <div class="ts-select-box">
+                <label for="tsVehicleSelect">Fleet Vehicle:</label>
+                <select id="tsVehicleSelect" class="custom-select">
+                  <option value="FL-101">FL-101 (Freightliner Cascadia)</option>
+                  <option value="FL-103">FL-103 (Volvo VNL 860)</option>
+                  <option value="FL-105">FL-105 (Mack Anthem)</option>
+                  <option value="FL-107">FL-107 (Western Star 49X)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scenario Narrative Description -->
+          <div class="scenario-narrative" id="tsScenarioNarrative">
+            <span class="narrative-icon">ℹ️</span>
+            <span id="tsScenarioDescText">Loading scenario description...</span>
+          </div>
+
+          <!-- Interactive Playback Toolbar -->
+          <div class="playback-toolbar">
+            <div class="playback-buttons">
+              <button class="play-btn" id="tsPlayBtn" aria-label="Play or Pause">
+                <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <svg id="pauseIcon" class="hidden" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                <span id="playBtnText">Play Progression</span>
+              </button>
+              <button class="tool-btn" id="tsResetBtn" title="Reset to start">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+                Reset (00:00)
+              </button>
+            </div>
+
+            <!-- Scrub Slider -->
+            <div class="scrub-container">
+              <div class="scrub-label-row">
+                <span class="scrub-label">Timeline Scrubber:</span>
+                <span class="scrub-time-badge"><span id="tsCurrentMinuteText">00:00</span> / 60:00 min</span>
+              </div>
+              <input type="range" id="tsScrubber" min="0" max="60" step="1" value="0" class="timeline-slider">
+            </div>
+
+            <!-- Speed Selector -->
+            <div class="speed-selector">
+              <span class="speed-label">Speed:</span>
+              <button class="speed-btn active" data-speed="1">1×</button>
+              <button class="speed-btn" data-speed="2">2×</button>
+              <button class="speed-btn" data-speed="5">5×</button>
+            </div>
+          </div>
+
+          <!-- Quick State Jump Bar -->
+          <div class="phase-jump-bar">
+            <span class="jump-lbl">Jump To State:</span>
+            <button class="jump-pill" onclick="scrubToTime(0)">🟩 00:00 Normal Baseline</button>
+            <button class="jump-pill" onclick="scrubToTime(25)">🟨 00:25 Degradation Drift</button>
+            <button class="jump-pill" onclick="scrubToTime(45)">🟥 00:45 Failure Triggered</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Live Telemetry Status at Time T -->
+        <div class="card ts-readout-card">
+          <div class="ts-status-banner">
+            <div class="ts-state-phase" id="tsStatePhaseBadge">
+              <span class="phase-dot"></span>
+              <span id="tsStatePhaseText">NORMAL OPERATING STATE</span>
+            </div>
+            <div class="ts-risk-summary">
+              <span class="ts-risk-score">Failure Risk: <strong id="tsProbScore">0.4%</strong></span>
+              <span class="ts-risk-pill low" id="tsRiskPill">LOW RISK</span>
+              <span class="ts-range-tag in-range" id="tsRangeTag">In-Range</span>
+            </div>
+          </div>
+
+          <div class="ts-telemetry-live-grid">
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Engine Speed</span>
+              <span class="stat-val" id="tsLiveRpm">1,600 RPM</span>
+            </div>
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Engine Torque</span>
+              <span class="stat-val" id="tsLiveTorque">42.0 N·m</span>
+            </div>
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Coolant Temp</span>
+              <span class="stat-val" id="tsLiveCoolant">36.5 °C</span>
+            </div>
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Ambient Temp</span>
+              <span class="stat-val" id="tsLiveAmbient">26.0 °C</span>
+            </div>
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Δ Temp (Proc - Air)</span>
+              <span class="stat-val highlight" id="tsLiveTempDiff">10.5 K</span>
+            </div>
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Power Output</span>
+              <span class="stat-val highlight" id="tsLivePower">7.04 kW</span>
+            </div>
+            <div class="ts-live-stat">
+              <span class="stat-lbl">Wear Accumulation</span>
+              <span class="stat-val" id="tsLiveWear">30.0 min</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHARTS SECTION -->
+        <div class="card ts-charts-card">
+          <div class="chart-box-header">
+            <div>
+              <h3 class="chart-heading">Failure Risk Trajectory (%) & Anomaly Phase Boundary</h3>
+              <p class="chart-sub">Real-time inference probabilities mapped across 60-minute duration</p>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot normal"></span> Normal (&lt;15%)</span>
+              <span class="legend-item"><span class="legend-dot elevated"></span> Elevated (15-50%)</span>
+              <span class="legend-item"><span class="legend-dot high"></span> High Risk (50-80%)</span>
+              <span class="legend-item"><span class="legend-dot critical"></span> Critical (&gt;80%)</span>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper">
+            <canvas id="riskTimelineCanvas" height="220"></canvas>
+            <div id="chartTooltip" class="chart-tooltip hidden"></div>
+          </div>
+        </div>
+
+        <!-- Multi-Sensor Synchronized Telemetry Curves -->
+        <div class="card ts-charts-card">
+          <div class="chart-box-header">
+            <div>
+              <h3 class="chart-heading">Multi-Sensor Telemetry Waveforms (Synchronized)</h3>
+              <p class="chart-sub">Coolant vs Ambient Temp (°C), Engine RPM, Torque (N·m), and Power (kW)</p>
+            </div>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-line temp"></span> Coolant Temp</span>
+              <span class="legend-item"><span class="legend-line ambient"></span> Ambient Temp</span>
+              <span class="legend-item"><span class="legend-line rpm"></span> RPM</span>
+              <span class="legend-item"><span class="legend-line torque"></span> Torque</span>
+              <span class="legend-item"><span class="legend-line power"></span> Power (kW)</span>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper">
+            <canvas id="telemetryTimelineCanvas" height="240"></canvas>
+          </div>
+        </div>
+
+        <!-- Anomaly Event Log Timeline -->
+        <div class="card ts-events-card">
+          <div class="card-header">
+            <div>
+              <h3 class="card-title">Degradation Milestone & Diagnostic Timeline</h3>
+              <p class="card-subtitle">Chronological sequence of physical sensor drift and machine failure trigger points</p>
+            </div>
+          </div>
+          <div class="events-timeline" id="tsEventsTimeline">
+            <!-- Dynamically populated milestones -->
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-container">
+      <span>FleetGuard AI &bull; Predictive Telemetry Engine v1.0.0</span>
+      <span>Artifact: <code>ml/models/failure_clf.joblib</code> &bull; Dataset: <code>dataset/ai4i2020.csv</code></span>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
