@@ -85,6 +85,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .status-dot-blue { background: var(--blue); }
 .status-dot-grey { background: var(--subtle); }
 .status-dot-amber { background: var(--amber); }
+.status-dot-red { background: var(--red); }
 .sidebar-collapsed .sidebar-status { justify-content: center; padding: 13px 0; }
 .main-shell { min-height: 100vh; margin-left: 252px; transition: margin-left 180ms ease; }
 .sidebar-collapsed .main-shell { margin-left: 76px; }
@@ -115,6 +116,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .notice svg { flex: none; margin-top: 1px; }
 .notice-info { color: var(--muted); background: var(--blue-soft); border-color: color-mix(in srgb, var(--blue) 28%, var(--line)); }
 .notice-info svg { color: var(--blue); }
+.notice-success { color: var(--muted); background: rgba(52, 211, 153, 0.08); border-color: color-mix(in srgb, var(--green) 28%, var(--line)); }
+.notice-success svg { color: var(--green); }
 .notice-warning { color: var(--muted); background: rgba(251, 191, 36, 0.07); border-color: color-mix(in srgb, var(--amber) 25%, var(--line)); }
 .notice-warning svg { color: var(--amber); }
 .notice b { color: var(--text); }

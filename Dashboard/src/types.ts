@@ -62,6 +62,7 @@ export interface FuelStatus {
 
 export interface Vehicle {
   vehicle_id: string;
+  device_id?: string | null;
   vehicle_type: string;
   registration: string;
   driver: string | null;
@@ -74,7 +75,7 @@ export interface Vehicle {
   readings: Reading[];
   status: VehicleStatus | null;
   fuel_status: FuelStatus | null;
-  current_scenario: DemoScenario;
+  current_scenario: DemoScenario | null;
   model_inputs?: {
     ambient_temp_c: number;
     coolant_temp_c: number;

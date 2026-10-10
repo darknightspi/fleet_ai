@@ -14,12 +14,14 @@ const BASE_NOW = Date.now();
 const INTERVAL_MS = 15 * 60_000;
 
 const vehicleSeeds = [
-  { id: "V-001", type: "Long-haul truck", driver: "Avery Brooks", scenario: "Normal operation" as const },
-  { id: "V-002", type: "Delivery van", driver: "Morgan Lee", scenario: "Persistent cooling degradation" as const },
-  { id: "V-003", type: "Utility truck", driver: "Jordan Patel", scenario: "Increasing vibration" as const },
-  { id: "V-004", type: "Cab-over truck", driver: "Taylor Kim", scenario: "Single noisy temperature spike" as const },
-  { id: "V-005", type: "Box truck", driver: "Casey Nguyen", scenario: "Excessive idling" as const },
-  { id: "V-006", type: "Electric truck", driver: null, scenario: "Stale telemetry / disconnection" as const },
+  { id: "001", type: "Long-haul truck", driver: "Avery Brooks", scenario: "Normal operation" as const },
+  { id: "002", type: "Delivery van", driver: "Morgan Lee", scenario: "Persistent cooling degradation" as const },
+  { id: "003", type: "Utility truck", driver: "Jordan Patel", scenario: "Increasing vibration" as const },
+  { id: "004", type: "Cab-over truck", driver: "Taylor Kim", scenario: "Single noisy temperature spike" as const },
+  { id: "005", type: "Box truck", driver: "Casey Nguyen", scenario: "Excessive idling" as const },
+  { id: "006", type: "Electric truck", driver: null, scenario: "Stale telemetry / disconnection" as const },
+  { id: "007", type: "Flatbed truck", driver: null, scenario: "Normal operation" as const },
+  { id: "008", type: "Service truck", driver: null, scenario: "Normal operation" as const },
 ];
 
 const scenarioNames: DemoScenario[] = [
@@ -46,25 +48,25 @@ function makeReadings(vehicleId: string, scenario: DemoScenario, now: number, of
     const progress = index / 95;
     const time = new Date(now - staleShift * 3_600_000 - (95 - index) * INTERVAL_MS).toISOString();
     const ambient = 22 + Math.sin(index / 14 + seedIndex) * 2.8;
-    const moving = vehicleId !== "V-005" && vehicleId !== "V-006";
+    const moving = vehicleId !== "005" && vehicleId !== "006";
     let speed = moving ? Math.max(0, 38 + Math.sin(index / 8 + seedIndex) * 20) : 0;
-    let engineOn = vehicleId !== "V-006";
+    let engineOn = vehicleId !== "006";
     let load = engineOn ? 90 + 90 * Math.abs(Math.sin(index / 9 + seedIndex)) : 0;
     let vibration = 0.18 + Math.abs(Math.sin(index / 7 + seedIndex)) * 0.13;
     const expected = baselineTemperature(ambient, load);
     let coolant = expected + 1.5 + Math.sin(index / 6 + seedIndex) * 1.2;
     let fuel = Math.max(20, 86 - progress * (8 + seedIndex * 0.4));
 
-    if (vehicleId === "V-002" || scenario === "Persistent cooling degradation") {
+    if (vehicleId === "002" || scenario === "Persistent cooling degradation") {
       coolant += scenario === "Persistent cooling degradation" ? 7 + progress * 14 : progress * 15;
     }
-    if (vehicleId === "V-003" || scenario === "Increasing vibration") {
+    if (vehicleId === "003" || scenario === "Increasing vibration") {
       vibration += scenario === "Increasing vibration" ? 0.16 + progress * 0.68 : progress * 0.58;
     }
-    if ((vehicleId === "V-004" && index === 61) || (scenario === "Single noisy temperature spike" && index === 61)) {
+    if ((vehicleId === "004" && index === 61) || (scenario === "Single noisy temperature spike" && index === 61)) {
       coolant += 28;
     }
-    if (vehicleId === "V-005" || scenario === "Excessive idling") {
+    if (vehicleId === "005" || scenario === "Excessive idling") {
       engineOn = true;
       speed = 0;
       load = 45;
@@ -110,8 +112,8 @@ function makeReadings(vehicleId: string, scenario: DemoScenario, now: number, of
       coolant_temp_c: coolant,
       vibration_rms_g: vibration,
       accel_long_g: 0.04 * Math.sin(index / 4),
-      battery_v: vehicleId === "V-006" ? null : 13.8 + 0.3 * Math.sin(index / 12),
-      fuel_level_pct: vehicleId === "V-006" ? null : Math.max(0, fuel),
+      battery_v: vehicleId === "006" ? null : 13.8 + 0.3 * Math.sin(index / 12),
+      fuel_level_pct: vehicleId === "006" ? null : Math.max(0, fuel),
       odometer_km: 90_000 + seedIndex * 15_000 + index * Math.max(0, speed) * 0.25 / 96,
       engine_hours_since_service: 220 + seedIndex * 110 + index * (engineOn ? 0.004 : 0),
       lat: null,
@@ -305,8 +307,8 @@ function makeInitialSnapshot(): FleetSnapshot {
   const workOrders: WorkOrder[] = [
     {
       work_order_id: "DEMO-WO-001",
-      vehicle_id: "V-002",
-      linked_alert_id: alerts.find((alert) => alert.vehicle_id === "V-002")?.alert_id ?? null,
+      vehicle_id: "002",
+      linked_alert_id: alerts.find((alert) => alert.vehicle_id === "002")?.alert_id ?? null,
       issue_summary: "Inspect persistent simulated cooling trend",
       recommended_inspection: "Check coolant circuit and validate temperature sensor after confirming telemetry.",
       priority: "High",

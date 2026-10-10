@@ -40,7 +40,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useEffect, useState, type ReactNode } from "react";
-import { configuredDemoBaseline, formatTime, openAlertCount } from "./analytics";
+import { configuredDemoBaseline, formatTime, hardwareConnectionCounts, openAlertCount } from "./analytics";
 import type { Alert, AlertSeverity, FleetSnapshot, RiskBand, Vehicle } from "./types";
 import { FleetMap } from "./map";
 
@@ -60,10 +60,12 @@ const routeTitles: Record<string, string> = Object.fromEntries(navigation.map((i
 
 export function AppShell({
   snapshot,
+  backendState,
   children,
   onGlobalSearch,
 }: {
   snapshot: FleetSnapshot;
+  backendState: "connected" | "reconnecting" | "unavailable";
   children: ReactNode;
   onGlobalSearch: (value: string) => void;
 }) {
@@ -73,6 +75,16 @@ export function AppShell({
   const [search, setSearch] = useState("");
   const [dark, setDark] = useState(() => localStorage.getItem("fleetguard-theme") !== "light");
   const title = routeTitles[location.pathname] ?? "FleetGuard AI";
+  const backendLabel = snapshot.mode === "mock"
+    ? "Local simulator"
+    : backendState === "connected" ? "Backend connected"
+      : backendState === "reconnecting" ? "Backend reconnecting" : "Backend unavailable";
+  const hardwareCounts = hardwareConnectionCounts(snapshot);
+  const dataLabel = `Hardware connected: ${hardwareCounts.connected} · Demo units: ${hardwareCounts.simulated}`;
+  const statusDotClass = snapshot.mode === "mock"
+    ? "status-dot-blue"
+    : backendState === "connected" ? ""
+      : backendState === "reconnecting" ? "status-dot-amber" : "status-dot-red";
 
   function toggleTheme() {
     const next = !dark;
@@ -118,8 +130,8 @@ export function AppShell({
         </nav>
         <div className="sidebar-spacer" />
         <div className="sidebar-status">
-          <span className="status-dot status-dot-blue" />
-          {!collapsed && <span><b>SIMULATED DEMO</b><small>Backend not connected</small></span>}
+          <span className={`status-dot ${statusDotClass}`} />
+          {!collapsed && <span><b>{backendLabel}</b><small>{dataLabel}</small></span>}
         </div>
         {!collapsed && <div className="sidebar-foot">TH2-PS-SA-027 · Demo build</div>}
       </aside>

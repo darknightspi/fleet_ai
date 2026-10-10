@@ -31,9 +31,13 @@ function DashboardRoutes() {
       if (active) {
         setSnapshot(data);
         setError(null);
+        setLiveState(data.mode === "backend" ? "connected" : "unavailable");
       }
     }).catch((requestError: unknown) => {
-      if (active) setError(requestError instanceof Error ? requestError.message : "Could not load fleet data.");
+      if (active) {
+        setLiveState("unavailable");
+        setError(requestError instanceof Error ? requestError.message : "Could not load fleet data.");
+      }
     });
     const unsubscribe = fleetApi.subscribeLive((data) => setSnapshot(data), setLiveState);
     return () => {
@@ -93,9 +97,15 @@ function DashboardRoutes() {
   }
 
   if (error) {
-    return <div className="loading-screen"><div className="error-state"><Activity size={25} /><h1>Fleet data failed to load</h1><p>{error}</p><button className="button button-primary" onClick={() => {
+    return <div className="loading-screen"><div className="error-state"><Activity size={25} /><h1>Backend unavailable</h1><p>{error}</p><p>The dashboard is configured for Flask, but the API request did not succeed.</p><button className="button button-primary" onClick={() => {
       setError(null);
-      fleetApi.getSnapshot().then(setSnapshot).catch((requestError: unknown) => setError(requestError instanceof Error ? requestError.message : "Could not reload fleet data."));
+      fleetApi.getSnapshot().then((data) => {
+        setSnapshot(data);
+        setLiveState(data.mode === "backend" ? "connected" : "unavailable");
+      }).catch((requestError: unknown) => {
+        setLiveState("unavailable");
+        setError(requestError instanceof Error ? requestError.message : "Could not reload fleet data.");
+      });
     }}><RefreshCw size={15} /> Retry</button></div></div>;
   }
   if (!snapshot) {
@@ -104,7 +114,7 @@ function DashboardRoutes() {
 
   const selectedVehicle = snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === selectedVehicleId) ?? null;
   return (
-    <AppShell snapshot={snapshot} onGlobalSearch={globalSearch}>
+    <AppShell snapshot={snapshot} backendState={liveState} onGlobalSearch={globalSearch}>
       <Routes>
         <Route path="/" element={<OverviewPage snapshot={snapshot} onSelectVehicle={selectVehicle} onAcknowledge={acknowledge} onCreateWorkOrder={workOrder} />} />
         <Route path="/fleet" element={<FleetPage snapshot={snapshot} onSelectVehicle={selectVehicle} />} />

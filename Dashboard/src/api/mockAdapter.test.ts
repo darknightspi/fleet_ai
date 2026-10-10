@@ -4,7 +4,8 @@ import { acknowledgeAlert, applyScenario, createWorkOrder, resetDemo, updateCost
 describe("deterministic demo adapter", () => {
   it("starts with six simulated vehicles and no fabricated locations", () => {
     const snapshot = resetDemo();
-    expect(snapshot.vehicles).toHaveLength(6);
+    expect(snapshot.vehicles).toHaveLength(8);
+    expect(snapshot.vehicles.map((vehicle) => vehicle.vehicle_id)).toEqual(["001", "002", "003", "004", "005", "006", "007", "008"]);
     expect(snapshot.vehicles.every((vehicle) => vehicle.source === "Simulated")).toBe(true);
     expect(snapshot.vehicles.every((vehicle) => vehicle.location === null)).toBe(true);
     expect(snapshot.vehicles[5].connectivity).toBe("Stale");
@@ -14,8 +15,8 @@ describe("deterministic demo adapter", () => {
 
   it("confirms persistent cooling while retaining single-spike rejection", () => {
     const snapshot = resetDemo();
-    expect(snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === "V-002")?.demo_evidence?.cooling_confirmed).toBe(true);
-    const spikeVehicle = snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === "V-004");
+    expect(snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === "002")?.demo_evidence?.cooling_confirmed).toBe(true);
+    const spikeVehicle = snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === "004");
     expect(spikeVehicle?.demo_evidence?.single_spike_ignored).toBe(true);
     expect(spikeVehicle?.demo_evidence?.cooling_confirmed).toBe(false);
     expect(snapshot.vehicles[0].status?.failure_prob).toBeNull();
@@ -42,8 +43,8 @@ describe("deterministic demo adapter", () => {
 
   it("resets an injected scenario to the same deterministic baseline", () => {
     const initial = resetDemo();
-    const changed = applyScenario(initial, "V-001", "Persistent cooling degradation");
-    expect(changed.vehicles.find((vehicle) => vehicle.vehicle_id === "V-001")?.demo_evidence?.cooling_confirmed).toBe(true);
+    const changed = applyScenario(initial, "001", "Persistent cooling degradation");
+    expect(changed.vehicles.find((vehicle) => vehicle.vehicle_id === "001")?.demo_evidence?.cooling_confirmed).toBe(true);
     const reset = resetDemo();
     expect(reset.vehicles[0].current_scenario).toBe(initial.vehicles[0].current_scenario);
     expect(reset.vehicles[0].status?.risk_score).toBe(initial.vehicles[0].status?.risk_score);
@@ -51,7 +52,7 @@ describe("deterministic demo adapter", () => {
 
   it("detects a simulated rapid fuel drop only as a suspicion and applies its configured threshold", () => {
     const initial = resetDemo();
-    const changed = applyScenario(initial, "V-001", "Fuel drop while stationary");
+    const changed = applyScenario(initial, "001", "Fuel drop while stationary");
     expect(changed.vehicles[0].fuel_status?.fuel_drop_event).toBe(true);
     const stricter = updateCostAssumptions(changed, { fuel_drop_threshold_pct: 25 });
     expect(stricter.vehicles[0].fuel_status?.fuel_drop_event).toBe(false);

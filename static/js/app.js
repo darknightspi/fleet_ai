@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const modelStatusPill = document.getElementById('modelStatusPill');
   const modelStatusText = document.getElementById('modelStatusText');
   const fleetGrid = document.getElementById('fleetGrid');
+  const fleetConnectionNotice = document.getElementById('fleetConnectionNotice');
+  const fleetCountBadge = document.getElementById('fleetCountBadge');
 
   // Tabs
   const tabBtns = document.querySelectorAll('.tab-btn');
@@ -107,15 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Simulated Fleet
   const FLEET_DATA = [
-    { id: 'FL-101', model: 'Freightliner Cascadia', duty: 'heavy', ambient_temp_c: 26.0, coolant_temp_c: 36.2, engine_rpm: 1520, engine_torque_nm: 42.5, operating_wear_min: 50 },
-    { id: 'FL-102', model: 'Kenworth T680', duty: 'medium', ambient_temp_c: 28.5, coolant_temp_c: 38.0, engine_rpm: 1560, engine_torque_nm: 44.0, operating_wear_min: 90 },
-    { id: 'FL-103', model: 'Volvo VNL 860', duty: 'heavy', ambient_temp_c: 31.0, coolant_temp_c: 37.2, engine_rpm: 1310, engine_torque_nm: 50.0, operating_wear_min: 120 }, // High risk (HDF)
-    { id: 'FL-104', model: 'Peterbilt 579', duty: 'medium', ambient_temp_c: 25.0, coolant_temp_c: 35.0, engine_rpm: 1480, engine_torque_nm: 40.0, operating_wear_min: 30 },
-    { id: 'FL-105', model: 'Mack Anthem', duty: 'heavy', ambient_temp_c: 27.0, coolant_temp_c: 38.5, engine_rpm: 2800, engine_torque_nm: 72.0, operating_wear_min: 160 }, // Critical (PWF)
-    { id: 'FL-106', model: 'International LT', duty: 'light', ambient_temp_c: 24.5, coolant_temp_c: 34.8, engine_rpm: 1490, engine_torque_nm: 38.0, operating_wear_min: 75 },
-    { id: 'FL-107', model: 'Western Star 49X', duty: 'heavy', ambient_temp_c: 28.0, coolant_temp_c: 38.2, engine_rpm: 1410, engine_torque_nm: 66.0, operating_wear_min: 220 }, // High risk (OSF)
-    { id: 'FL-108', model: 'Kenworth W990', duty: 'medium', ambient_temp_c: 25.5, coolant_temp_c: 36.0, engine_rpm: 1530, engine_torque_nm: 43.0, operating_wear_min: 60 }
+    { id: '001', model: 'Freightliner Cascadia', duty: 'heavy', ambient_temp_c: 26.0, coolant_temp_c: 36.2, engine_rpm: 1520, engine_torque_nm: 42.5, operating_wear_min: 50 },
+    { id: '002', model: 'Kenworth T680', duty: 'medium', ambient_temp_c: 28.5, coolant_temp_c: 38.0, engine_rpm: 1560, engine_torque_nm: 44.0, operating_wear_min: 90 },
+    { id: '003', model: 'Volvo VNL 860', duty: 'heavy', ambient_temp_c: 31.0, coolant_temp_c: 37.2, engine_rpm: 1310, engine_torque_nm: 50.0, operating_wear_min: 120 },
+    { id: '004', model: 'Peterbilt 579', duty: 'medium', ambient_temp_c: 25.0, coolant_temp_c: 35.0, engine_rpm: 1480, engine_torque_nm: 40.0, operating_wear_min: 30 },
+    { id: '005', model: 'Mack Anthem', duty: 'heavy', ambient_temp_c: 27.0, coolant_temp_c: 38.5, engine_rpm: 2800, engine_torque_nm: 72.0, operating_wear_min: 160 },
+    { id: '006', model: 'International LT', duty: 'light', ambient_temp_c: 24.5, coolant_temp_c: 34.8, engine_rpm: 1490, engine_torque_nm: 38.0, operating_wear_min: 75 },
+    { id: '007', model: 'Western Star 49X', duty: 'heavy', ambient_temp_c: 28.0, coolant_temp_c: 38.2, engine_rpm: 1410, engine_torque_nm: 66.0, operating_wear_min: 220 },
+    { id: '008', model: 'Kenworth W990', duty: 'medium', ambient_temp_c: 25.5, coolant_temp_c: 36.0, engine_rpm: 1530, engine_torque_nm: 43.0, operating_wear_min: 60 }
   ];
+  let currentFleetData = [];
 
   // Tab Switching
   tabBtns.forEach(btn => {
@@ -359,27 +362,62 @@ document.addEventListener('DOMContentLoaded', () => {
     fleetGrid.innerHTML = '<p style="color: #94a3b8;">Loading fleet telemetry...</p>';
     try {
       const resp = await fetch('/api/fleet');
+      if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);
       const fleet = await resp.json();
-      
-      fleetGrid.innerHTML = fleet.map(v => `
-        <div class="vehicle-card status-${v.risk_level.toLowerCase()}" data-id="${v.id}" onclick="loadVehicleTelemetry('${v.id}')">
+      currentFleetData = fleet;
+      const hardware = fleet.filter(v => v.source === 'Hardware');
+      const connectedCount = hardware.filter(v => v.connectivity === 'Online').length;
+      const staleCount = hardware.filter(v => v.connectivity === 'Stale').length;
+      const disconnectedCount = hardware.filter(v => v.connectivity === 'Offline').length;
+      const simulatedCount = fleet.filter(v => v.source !== 'Hardware').length;
+      fleetConnectionNotice.textContent = connectedCount
+        ? `Hardware Connected: ${connectedCount} real RC unit${connectedCount === 1 ? '' : 's'} connected. Simulated demonstration units remain available.${staleCount ? ` ${staleCount} registered unit${staleCount === 1 ? ' has' : 's have'} stale telemetry.` : ''}${disconnectedCount ? ` ${disconnectedCount} registered unit${disconnectedCount === 1 ? ' is' : 's are'} disconnected.` : ''}`
+        : `Demo Mode: No physical RC units connected. The displayed fleet contains ${simulatedCount ? 'simulated demonstration data' : 'no simulated units'}.${staleCount ? ` ${staleCount} registered unit${staleCount === 1 ? ' has' : 's have'} stale telemetry.` : ''}${disconnectedCount ? ` ${disconnectedCount} registered unit${disconnectedCount === 1 ? ' is' : 's are'} disconnected.` : ''}`;
+      fleetConnectionNotice.className = connectedCount ? 'fleet-connection-notice is-connected' : 'fleet-connection-notice';
+      fleetCountBadge.textContent = String(fleet.length);
+      document.querySelectorAll('.filter-btn').forEach(button => {
+        const filter = button.dataset.filter;
+        const label = filter === 'all' ? 'All'
+          : filter === 'CRITICAL' ? 'Critical'
+            : filter === 'HIGH' ? 'High Risk' : 'Nominal';
+        const count = filter === 'all' ? fleet.length : fleet.filter(v => v.risk_level === filter).length;
+        button.textContent = `${label} (${count})`;
+      });
+
+      const escapeHtml = value => String(value ?? 'Unavailable').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+      fleetGrid.innerHTML = fleet.map(v => {
+        const riskLevel = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(v.risk_level) ? v.risk_level : 'UNKNOWN';
+        const modelInputsReady = [v.ambient_temp_c, v.coolant_temp_c, v.engine_rpm, v.engine_torque_nm, v.operating_wear_min]
+          .every(value => typeof value === 'number' && Number.isFinite(value));
+        const probability = typeof v.failure_probability === 'number'
+          ? `${(v.failure_probability * 100).toFixed(0)}%`
+          : 'Not assessed';
+        const sourceLabel = v.source === 'Hardware' ? 'REAL HARDWARE' : 'SIMULATED';
+        return `
+        <div class="vehicle-card status-${riskLevel.toLowerCase()}" data-id="${escapeHtml(v.id)}" data-diagnosable="${modelInputsReady}">
           <div class="vehicle-card-top">
             <div>
-              <div class="vehicle-id">${v.id}</div>
-              <div class="vehicle-model">${v.model} &bull; ${v.duty.toUpperCase()} Duty</div>
+              <div class="vehicle-id">${escapeHtml(v.id)}</div>
+              <div class="vehicle-model">${escapeHtml(v.model)} &bull; ${escapeHtml(v.duty).toUpperCase()} Duty · ${sourceLabel}</div>
             </div>
-            <span class="vehicle-status-tag ${v.risk_level.toLowerCase()}">${v.risk_level} (${(v.failure_probability * 100).toFixed(0)}%)</span>
+            <span class="vehicle-status-tag ${riskLevel.toLowerCase()}">${riskLevel} (${probability}) · ${escapeHtml(v.connectivity)}</span>
           </div>
           <div class="vehicle-telemetry-mini">
-            <div class="v-stat"><span class="v-label">Engine RPM</span><span class="v-val">${v.engine_rpm}</span></div>
-            <div class="v-stat"><span class="v-label">Coolant</span><span class="v-val">${v.coolant_temp_c}°C</span></div>
-            <div class="v-stat"><span class="v-label">Wear</span><span class="v-val">${v.operating_wear_min} min</span></div>
+            <div class="v-stat"><span class="v-label">Engine RPM</span><span class="v-val">${escapeHtml(v.engine_rpm)}</span></div>
+            <div class="v-stat"><span class="v-label">Coolant</span><span class="v-val">${escapeHtml(v.coolant_temp_c)}${v.coolant_temp_c == null ? '' : '°C'}</span></div>
+            <div class="v-stat"><span class="v-label">Wear</span><span class="v-val">${escapeHtml(v.operating_wear_min)}${v.operating_wear_min == null ? '' : ' min'}</span></div>
           </div>
           <div class="vehicle-action-link">
-            <span>Diagnose in Simulator</span> &rarr;
+            <span>${modelInputsReady ? 'Diagnose in Simulator' : 'Model inputs unavailable'}</span> &rarr;
           </div>
         </div>
-      `).join('');
+      `;
+      }).join('');
+      fleetGrid.querySelectorAll('.vehicle-card[data-diagnosable="true"]').forEach(card => {
+        card.addEventListener('click', () => window.loadVehicleTelemetry(card.dataset.id));
+      });
 
       // Filter buttons logic
       document.querySelectorAll('.filter-btn').forEach(fBtn => {
@@ -397,14 +435,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
       });
     } catch (e) {
+      fleetConnectionNotice.textContent = 'Backend unavailable. Could not confirm hardware or fleet status.';
+      fleetConnectionNotice.className = 'fleet-connection-notice';
       fleetGrid.innerHTML = `<p style="color:#ef4444;">Failed to load fleet data: ${e.message}</p>`;
     }
   }
 
   // Load a single vehicle into the telemetry simulator
   window.loadVehicleTelemetry = (vId) => {
-    const v = FLEET_DATA.find(item => item.id === vId);
-    if (!v) return;
+    const v = currentFleetData.find(item => item.id === vId) || FLEET_DATA.find(item => item.id === vId);
+    if (!v || ![v.ambient_temp_c, v.coolant_temp_c, v.engine_rpm, v.engine_torque_nm, v.operating_wear_min]
+      .every(value => typeof value === 'number' && Number.isFinite(value))) return;
 
     ambientTempInput.value = v.ambient_temp_c;
     coolantTempInput.value = v.coolant_temp_c;
@@ -508,7 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentMinute = 0;
 
   // Load Time Series Data from Server
-  async function loadTimeSeries(scenario = 'heat_dissipation', vehicleId = 'FL-101') {
+  async function loadTimeSeries(scenario = 'heat_dissipation', vehicleId = '001') {
     try {
       const resp = await fetch(`/api/timeseries?scenario=${scenario}&vehicle_id=${vehicleId}&mock=${mockModeSwitch.checked}`);
       if (!resp.ok) throw new Error(`HTTP error ${resp.status}`);

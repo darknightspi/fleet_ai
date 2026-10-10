@@ -1,4 +1,4 @@
-import type { FleetSnapshot, Vehicle } from "../types";
+import type { FleetSnapshot, Reading, Vehicle } from "../types";
 import { resetDemo } from "./mockAdapter";
 
 export interface FleetApi {
@@ -9,20 +9,46 @@ export interface FleetApi {
 }
 
 type BackendHealth = { status: string; model_loaded: boolean; mock_mode: boolean };
+type BackendTelemetry = Partial<Omit<Reading, "schema_version" | "vehicle_id" | "seq" | "source">> & {
+  engine_torque_nm?: number;
+  operating_wear_min?: number;
+  vehicle_duty_type?: string;
+};
 type BackendTruck = {
   id: string;
+  device_id?: string;
   model: string;
   duty: string;
+  source?: "Hardware" | "Simulated" | "Replay";
+  connectivity?: "Online" | "Stale" | "Offline" | "Unknown";
+  last_seen?: string | null;
+  telemetry?: BackendTelemetry;
+  telemetry_seq?: number;
+  ambient_temp_c: number | null;
+  coolant_temp_c: number | null;
+  engine_rpm: number | null;
+  engine_torque_nm: number | null;
+  operating_wear_min: number | null;
+  failure_predicted: boolean | null;
+  failure_probability: number | null;
+  risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "UNKNOWN";
+  model_in_range: boolean | null;
+};
+type BackendTruckWithModelInputs = BackendTruck & {
   ambient_temp_c: number;
   coolant_temp_c: number;
   engine_rpm: number;
   engine_torque_nm: number;
   operating_wear_min: number;
-  failure_predicted: boolean;
-  failure_probability: number;
-  risk_level: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-  model_in_range: boolean;
 };
+
+function hasCompleteModelInputs(truck: BackendTruck): truck is BackendTruckWithModelInputs {
+  return typeof truck.ambient_temp_c === "number" && Number.isFinite(truck.ambient_temp_c) &&
+    typeof truck.coolant_temp_c === "number" && Number.isFinite(truck.coolant_temp_c) &&
+    typeof truck.engine_rpm === "number" && Number.isFinite(truck.engine_rpm) &&
+    typeof truck.engine_torque_nm === "number" && Number.isFinite(truck.engine_torque_nm) &&
+    typeof truck.operating_wear_min === "number" && Number.isFinite(truck.operating_wear_min);
+}
 
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
@@ -46,29 +72,64 @@ function vehicleFromBackend(truck: BackendTruck): Vehicle {
   const percent = probability === null ? null : Math.round(probability * 100);
   const riskBand = truck.risk_level === "LOW" ? "Normal"
     : truck.risk_level === "MEDIUM" ? "Watch"
-      : truck.risk_level === "HIGH" ? "High" : "Critical";
+      : truck.risk_level === "HIGH" ? "High"
+        : truck.risk_level === "CRITICAL" ? "Critical" : "Unknown";
+  const source = truck.source ?? "Simulated";
+  const telemetry = truck.telemetry;
+  const latestReading: Reading | null = source === "Hardware" && telemetry
+    ? {
+      schema_version: "1.0",
+      vehicle_id: truck.id,
+      ts: telemetry.ts ?? truck.last_seen ?? "",
+      seq: truck.telemetry_seq ?? 1,
+      source: "Hardware",
+      engine_on: telemetry.engine_on ?? null,
+      speed_kmph: telemetry.speed_kmph ?? null,
+      engine_rpm: telemetry.engine_rpm ?? truck.engine_rpm,
+      engine_load_nm: telemetry.engine_load_nm ?? null,
+      ambient_temp_c: telemetry.ambient_temp_c ?? truck.ambient_temp_c,
+      coolant_temp_c: telemetry.coolant_temp_c ?? truck.coolant_temp_c,
+      vibration_rms_g: telemetry.vibration_rms_g ?? null,
+      accel_long_g: telemetry.accel_long_g ?? null,
+      battery_v: telemetry.battery_v ?? null,
+      fuel_level_pct: telemetry.fuel_level_pct ?? null,
+      odometer_km: telemetry.odometer_km ?? null,
+      engine_hours_since_service: telemetry.engine_hours_since_service ?? null,
+      lat: telemetry.lat ?? null,
+      lon: telemetry.lon ?? null,
+    }
+    : null;
+  const speed = telemetry?.speed_kmph;
+  const engineOn = telemetry?.engine_on;
+  const operationalState = typeof speed === "number" && speed > 1
+    ? "Moving"
+    : engineOn === true && speed === 0 ? "Idle"
+      : engineOn === false ? "Parked" : "Unknown";
   return {
     vehicle_id: truck.id,
+    device_id: truck.device_id ?? null,
     vehicle_type: truck.model,
     registration: truck.id,
     driver: null,
-    source: "Simulated",
-    operational_state: "Unknown",
-    connectivity: "Unknown",
-    last_seen: null,
+    source,
+    operational_state: source === "Hardware" ? operationalState : "Unknown",
+    connectivity: truck.connectivity ?? "Unknown",
+    last_seen: truck.last_seen ?? null,
     data_quality: "Unknown",
-    location: null,
+    location: telemetry && typeof telemetry.lat === "number" && typeof telemetry.lon === "number"
+      ? { lat: telemetry.lat, lon: telemetry.lon, source: "Hardware", timestamp: telemetry.ts ?? truck.last_seen ?? "" }
+      : null,
     // /api/fleet is a current seeded snapshot, not a history feed.
-    readings: [],
-    current_scenario: "Normal operation",
-    model_inputs: {
+    readings: latestReading ? [latestReading] : [],
+    current_scenario: source === "Hardware" ? null : "Normal operation",
+    ...(hasCompleteModelInputs(truck) ? { model_inputs: {
       ambient_temp_c: truck.ambient_temp_c,
       coolant_temp_c: truck.coolant_temp_c,
       engine_rpm: truck.engine_rpm,
       engine_torque_nm: truck.engine_torque_nm,
       operating_wear_min: truck.operating_wear_min,
       duty: truck.duty,
-    },
+    } } : {}),
     status: {
       data_quality: "Unknown",
       model_in_range: truck.model_in_range,
@@ -78,8 +139,10 @@ function vehicleFromBackend(truck: BackendTruck): Vehicle {
       health: { cooling: null, drivetrain: null, fuel: null },
       hours_to_service: null,
       forecast_bounds: null,
-      explanation: `Backend ${truck.risk_level.toLowerCase()} tier${truck.failure_predicted ? "; failure threshold crossed" : ""}. The model is mapped from the AI4I industrial dataset and is not validated for truck failures.`,
-      provenance: "Flask /api/fleet prediction; simulated vehicle inputs",
+      explanation: probability === null
+        ? "No prediction was produced because this unit's latest telemetry does not include all required model inputs."
+        : `Backend ${truck.risk_level.toLowerCase()} tier${truck.failure_predicted ? "; failure threshold crossed" : ""}. The model is mapped from the AI4I industrial dataset and is not validated for truck failures.`,
+      provenance: `Flask /api/fleet; ${source.toLowerCase()} telemetry`,
     },
     fuel_status: null,
   };
@@ -100,13 +163,13 @@ export class FlaskFleetApi implements FleetApi {
       work_orders: [],
       summary: {
         total_vehicles: vehicles.length,
-        online_vehicles: null,
+        online_vehicles: vehicles.filter((vehicle) => vehicle.connectivity === "Online").length,
         attention_vehicles: vehicles.filter((vehicle) => ["High", "Critical"].includes(vehicle.status?.risk_band ?? "")).length,
         open_work_orders: 0,
         fuel_consumed_l_period: null,
         fuel_cost_period: null,
         time_window_label: "Current backend snapshot",
-        calculation_basis: "The Flask API does not supply telemetry history, GPS, fuel volume, alerts, or work orders.",
+        calculation_basis: "Online counts reflect registered hardware sessions; seeded demo units have no live connection state. No history, GPS, fuel volume, alerts, or work orders are supplied.",
       },
       cost_assumptions: {
         fuel_price_per_liter: 0,
@@ -132,7 +195,6 @@ export class FlaskFleetApi implements FleetApi {
   subscribeLive(onMessage: (snapshot: FleetSnapshot) => void, onState: (state: "connected" | "reconnecting" | "unavailable") => void): () => void {
     let stopped = false;
     let busy = false;
-    onState("connected");
     const refresh = async () => {
       if (busy || stopped) return;
       busy = true;

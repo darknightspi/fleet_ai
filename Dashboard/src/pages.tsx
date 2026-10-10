@@ -34,7 +34,7 @@ import {
 } from "recharts";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ageMinutes, filterVehicles, formatTime } from "./analytics";
+import { ageMinutes, filterVehicles, formatTime, hardwareConnectionCounts, hardwareConnectionNotice } from "./analytics";
 import { FleetMap } from "./map";
 import {
   applyScenario,
@@ -95,6 +95,7 @@ export function OverviewPage({
   onCreateWorkOrder: (alertId: string) => void;
 }) {
   const summary = snapshot.summary;
+  const hardwareCounts = hardwareConnectionCounts(snapshot);
   const attention = snapshot.vehicles.filter((vehicle) => ["High", "Critical"].includes(vehicle.status?.risk_band ?? "")).length;
   const focusVehicle = snapshot.vehicles.find((vehicle) => vehicle.demo_evidence?.cooling_confirmed) ?? snapshot.vehicles[0];
   const riskBands = ["Normal", "Watch", "High", "Critical", "Unknown"].map((band) => ({
@@ -105,14 +106,12 @@ export function OverviewPage({
   return (
     <>
       <PageHeader title="Fleet Overview" description="Fleet health, maintenance risk, and operational efficiency at a glance."
-        actions={<><SourceBadge source="Simulated" /><span className="updated-label"><Clock3 size={14} /> {snapshot.mode === "backend" ? "Backend snapshot" : "Last demo update"} {formatTime(snapshot.generated_at)}</span></>} />
-      <div className="notice notice-info"><Signal size={16} /><span>{snapshot.mode === "backend"
-        ? <><b>Flask backend connected:</b> showing its seeded simulated fleet and model predictions. This API has no GPS, history, fuel, alert, or work-order feed.</>
-        : <><b>Demo mode:</b> values are locally simulated. Backend, hardware, classifier probabilities, and verified GPS are not connected.</>}</span></div>
+        actions={<><Badge variant={hardwareCounts.registered && hardwareCounts.simulated ? "neutral" : hardwareCounts.registered ? "hardware" : "simulated"}>{hardwareCounts.registered && hardwareCounts.simulated ? "MIXED SOURCES" : hardwareCounts.registered ? "HARDWARE" : "SIMULATED"}</Badge><span className="updated-label"><Clock3 size={14} /> {snapshot.mode === "backend" ? "Backend snapshot" : "Last demo update"} {formatTime(snapshot.generated_at)}</span></>} />
+      <div className={hardwareCounts.connected > 0 ? "notice notice-success" : "notice notice-info"}><Signal size={16} /><span><b>{hardwareConnectionNotice(snapshot)}</b></span></div>
 
       <div className="kpi-grid">
-        <KpiCard label="Total vehicles" value={String(summary.total_vehicles)} detail={snapshot.mode === "backend" ? "In the backend seeded fleet" : "In the demo fleet"} icon={Truck} tone="blue" to="/fleet" />
-        <KpiCard label="Online" value={summary.online_vehicles === null ? "N/A" : String(summary.online_vehicles)} detail={snapshot.mode === "backend" ? "Backend supplies no freshness timestamps" : "Telemetry fresher than 60 min"} icon={Signal} tone="green" to="/fleet" />
+        <KpiCard label="Total vehicles" value={String(summary.total_vehicles)} detail={snapshot.mode === "backend" ? "Simulated and registered hardware units" : "Local simulated fleet"} icon={Truck} tone="blue" to="/fleet" />
+        <KpiCard label="Online" value={summary.online_vehicles === null ? "N/A" : String(summary.online_vehicles)} detail={snapshot.mode === "backend" ? "Connected physical RC units" : "Simulated telemetry fresher than 60 min"} icon={Signal} tone="green" to="/fleet" />
         <KpiCard label="Needs attention" value={String(attention)} detail={snapshot.mode === "backend" ? "High or critical backend prediction tier" : "Elevated demo display risk"} icon={ShieldAlert} tone="red" to="/maintenance-risk" />
         <KpiCard label="Open work orders" value={String(summary.open_work_orders)} detail="Local demo records" icon={ClipboardList} tone="amber" to="/work-orders" />
         <KpiCard label="Fuel consumed" value={summary.fuel_consumed_l_period === null ? "N/A" : summary.fuel_consumed_l_period.toFixed(1)} unit={summary.fuel_consumed_l_period === null ? "" : "L"} detail={summary.fuel_consumed_l_period === null ? "Fuel volume not supplied" : "Recorded liters in the selected period"} icon={Gauge} tone="blue" to="/fuel" />
@@ -197,7 +196,11 @@ export function FleetPage({ snapshot, onSelectVehicle }: { snapshot: FleetSnapsh
 
   return (
     <>
-      <PageHeader title="Fleet Monitoring" description="Search and inspect vehicles, telemetry freshness, and location availability." actions={<SourceBadge source="Simulated" />} />
+      <PageHeader title="Fleet Monitoring" description="Search and inspect vehicles, telemetry freshness, and location availability." actions={<Badge variant={snapshot.vehicles.some((vehicle) => vehicle.source === "Hardware") ? "neutral" : "simulated"}>{snapshot.vehicles.some((vehicle) => vehicle.source === "Hardware") ? "MIXED / HARDWARE" : "SIMULATED"}</Badge>} />
+      {(() => {
+        const counts = hardwareConnectionCounts(snapshot);
+        return <div className={counts.connected > 0 ? "notice notice-success" : "notice notice-info"}><Signal size={16} /><span>{hardwareConnectionNotice(snapshot)}</span></div>;
+      })()}
       <Card title="Fleet map" action={<Badge variant="unknown">GPS unavailable</Badge>}><FleetMap vehicles={filtered} onSelect={onSelectVehicle} /></Card>
       <Card title="Vehicle list" action={<span className="result-count">{filtered.length} of {snapshot.vehicles.length} vehicles</span>}>
         <div className="filter-bar">
@@ -262,7 +265,7 @@ export function PredictiveMaintenancePage({ snapshot, onSelectVehicle, onCreateW
         <Card title="Select vehicle" action={<span className="result-count">{snapshot.vehicles.length} vehicles</span>}>
           <div className="ranked-vehicles">{snapshot.vehicles.slice().sort((a, b) => (b.status?.risk_score ?? -1) - (a.status?.risk_score ?? -1)).map((item) => (
             <button className={`ranked-vehicle ${item.vehicle_id === vehicle.vehicle_id ? "selected" : ""}`} key={item.vehicle_id} onClick={() => setVehicleId(item.vehicle_id)}>
-              <div><b>{item.vehicle_id}</b><small>{item.vehicle_type} · {item.current_scenario}</small></div><RiskBadge band={item.status?.risk_band ?? "Unknown"} /><strong>{item.status?.risk_score ?? "N/A"}</strong>
+              <div><b>{item.vehicle_id}</b><small>{item.vehicle_type} · {item.current_scenario ?? "Hardware telemetry"}</small></div><RiskBadge band={item.status?.risk_band ?? "Unknown"} /><strong>{item.status?.risk_score ?? "N/A"}</strong>
             </button>
           ))}</div>
         </Card>
@@ -485,7 +488,7 @@ export function FuelAnalyticsPage({ snapshot, onSnapshotChange }: { snapshot: Fl
             (vehicle.fuel_status?.idle_minutes_today ?? -1) >= snapshot.cost_assumptions.excessive_idle_minutes ||
             vehicle.fuel_status?.fuel_drop_event === true,
           ).map((vehicle) => <div className="fuel-event" key={vehicle.vehicle_id}>
-            <div><b>{vehicle.vehicle_id}</b><small>{vehicle.current_scenario}</small></div><span>{vehicle.fuel_status?.idle_minutes_today ? `${vehicle.fuel_status.idle_minutes_today} min idle` : "Fuel drop signal"}</span><SourceBadge source="Simulated" />
+            <div><b>{vehicle.vehicle_id}</b><small>{vehicle.current_scenario ?? "Hardware telemetry"}</small></div><span>{vehicle.fuel_status?.idle_minutes_today ? `${vehicle.fuel_status.idle_minutes_today} min idle` : "Fuel drop signal"}</span><SourceBadge source={vehicle.source} />
             {vehicle.fuel_status?.fuel_drop_event && <p>Suspicious decrease detected while stationary. Validate the signal and vehicle state; this does not confirm theft or leakage.</p>}
           </div>)}
           {!snapshot.vehicles.some((vehicle) => (vehicle.fuel_status?.idle_minutes_today ?? -1) >= snapshot.cost_assumptions.excessive_idle_minutes || vehicle.fuel_status?.fuel_drop_event === true) && <EmptyState title="No events match current assumptions" detail="No valid idle or fuel-drop event meets the configured demo thresholds." icon={Fuel} />}
@@ -531,17 +534,20 @@ export function ReportsPage({ snapshot }: { snapshot: FleetSnapshot }) {
 }
 
 export function DevicesPage({ snapshot }: { snapshot: FleetSnapshot }) {
+  const hardwareCounts = hardwareConnectionCounts(snapshot);
   return (
     <>
-      <PageHeader title="IoT Devices" description="Inspect telemetry provenance and connection readiness without implying that simulated sensors are hardware." actions={<Badge variant="simulated">SIMULATOR ONLY</Badge>} />
-      <div className="notice notice-warning"><CloudOff size={16} /><span>No ESP32, Raspberry Pi gateway, MQTT broker, or hardware heartbeat is connected in this repository. Telemetry shown below is generated locally.</span></div>
-      <Card title="Telemetry sources" action={<span className="result-count">{snapshot.vehicles.length} simulated sources</span>}>
+      <PageHeader title="IoT Devices" description="Inspect telemetry provenance and connection readiness without implying that simulated sensors are hardware." actions={<Badge variant={hardwareCounts.connected > 0 ? "success" : "simulated"}>{hardwareCounts.connected > 0 ? `${hardwareCounts.connected} HARDWARE CONNECTED` : "NO HARDWARE CONNECTED"}</Badge>} />
+      <div className={hardwareCounts.connected > 0 ? "notice notice-success" : "notice notice-warning"}>{hardwareCounts.connected > 0 ? <Signal size={16} /> : <CloudOff size={16} />}<span>{hardwareCounts.connected > 0
+        ? <><b>{hardwareCounts.connected} physical RC {hardwareCounts.connected === 1 ? "unit is" : "units are"} currently connected.</b> The ESP32 Bluetooth transport is not implemented here; hardware data requires an external adapter to submit verified telemetry sessions.</>
+        : <><b>No physical RC unit is currently connected.</b> Simulated demonstration records remain available. An in-memory backend registration boundary exists, but the ESP32 Bluetooth transport is not implemented.</>}</span></div>
+      <Card title="Telemetry sources" action={<span className="result-count">{hardwareCounts.connected} connected hardware · {hardwareCounts.simulated} simulated</span>}>
         <div className="table-wrap"><table><thead><tr><th>Source ID</th><th>Vehicle</th><th>Source type</th><th>Connection</th><th>Last heartbeat</th><th>Last telemetry</th><th>Sensors</th><th>Firmware / signal</th></tr></thead><tbody>
-          {snapshot.vehicles.map((vehicle) => <tr key={vehicle.vehicle_id}><td><strong>SIM-{vehicle.vehicle_id}</strong><small>Local deterministic generator</small></td><td>{vehicle.vehicle_id}</td><td><SourceBadge source={vehicle.source} /></td><td><StateBadge state={vehicle.connectivity} /></td><td>Unavailable</td><td>{formatTime(vehicle.last_seen)}</td><td>{vehicle.data_quality === "Good" ? "Simulated values" : "Unavailable"}</td><td><span className="muted">Not supplied</span></td></tr>)}
+          {snapshot.vehicles.map((vehicle) => <tr key={vehicle.vehicle_id}><td><strong>{vehicle.source === "Hardware" ? vehicle.device_id ?? `HW-${vehicle.vehicle_id}` : `SIM-${vehicle.vehicle_id}`}</strong><small>{vehicle.source === "Hardware" ? "Registered hardware identity" : "Local deterministic generator"}</small></td><td>{vehicle.vehicle_id}</td><td><SourceBadge source={vehicle.source} /></td><td><StateBadge state={vehicle.connectivity} /></td><td>{vehicle.source === "Hardware" ? formatTime(vehicle.last_seen) : "Unavailable"}</td><td>{formatTime(vehicle.last_seen)}</td><td>{vehicle.readings.length ? "Telemetry received" : "Unavailable"}</td><td><span className="muted">Not supplied</span></td></tr>)}
         </tbody></table></div>
       </Card>
       <div className="two-column-grid">
-        <Card title="Device and gateway topology"><div className="topology"><div className="topology-node"><Cpu size={20} /><b>Vehicle telematics node</b><small>ESP32 · not connected</small></div><span className="topology-line" /><div className="topology-node"><Signal size={20} /><b>Edge gateway</b><small>Raspberry Pi 4 / MQTT · unknown</small></div><span className="topology-line" /><div className="topology-node"><Activity size={20} /><b>FleetGuard API</b><small>Not present in repository</small></div></div></Card>
+        <Card title="Device and gateway topology"><div className="topology"><div className="topology-node"><Cpu size={20} /><b>Vehicle telematics node</b><small>ESP32 · external transport required</small></div><span className="topology-line" /><div className="topology-node"><Signal size={20} /><b>Edge gateway</b><small>Raspberry Pi 4 / MQTT · integration not implemented</small></div><span className="topology-line" /><div className="topology-node"><Activity size={20} /><b>FleetGuard API</b><small>Flask · telemetry registration endpoint</small></div></div></Card>
         <Card title="Telemetry contract"><p className="card-subtitle">Mock readings use the documented field names listed in the provided prompt, including nullable values. No hidden evaluation labels are used.</p><code className="contract-code">schema_version · vehicle_id · ts · seq · source · engine_on · speed_kmph · engine_rpm · engine_load_nm · ambient_temp_c · coolant_temp_c · vibration_rms_g · accel_long_g · battery_v · fuel_level_pct · odometer_km · engine_hours_since_service · lat · lon</code></Card>
       </div>
     </>
@@ -612,7 +618,7 @@ export function SettingsPage({ snapshot, onSnapshotChange, onDemoReset }: {
           <div className="notice notice-info"><Zap size={16} /><span>Scenario injection updates only this frontend's in-memory mock adapter. It does not call a backend or alter evaluation labels.</span></div>
           <div className="field"><label htmlFor="demo-vehicle">Vehicle</label><select id="demo-vehicle" value={vehicleId} onChange={(event) => setVehicleId(event.target.value)}>{snapshot.vehicles.map((vehicle) => <option key={vehicle.vehicle_id} value={vehicle.vehicle_id}>{vehicle.vehicle_id} · {vehicle.vehicle_type}</option>)}</select></div>
           <div className="field"><label htmlFor="demo-scenario">Scenario</label><select id="demo-scenario" value={scenario} onChange={(event) => setScenario(event.target.value as DemoScenario)}>{scenarioOptions.map((option) => <option key={option}>{option}</option>)}</select></div>
-          <div className="active-scenario"><span className="status-dot status-dot-blue" /><div><b>Current scenario: {snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === vehicleId)?.current_scenario}</b><small>Simulated · repeatable · not real telematics</small></div></div>
+          <div className="active-scenario"><span className="status-dot status-dot-blue" /><div><b>Current scenario: {snapshot.vehicles.find((vehicle) => vehicle.vehicle_id === vehicleId)?.current_scenario ?? "None"}</b><small>Simulated · repeatable · not real telematics</small></div></div>
           {notice && <div className="inline-confirmation" role="status">{notice}</div>}
           <div className="button-row"><button className="button button-primary" onClick={startScenario}>Start scenario</button><button className="button button-secondary" onClick={stopScenario}>Stop / recover</button><button className="button button-quiet" onClick={reset}><RotateCcw size={14} /> Reset demo</button></div>
         </Card> : <Card title="Demo controls" className="demo-controls-card"><EmptyState title="Simulator controls are disabled" detail="Set VITE_FLEET_API_MODE=mock and restart Vite to use local scenario injection. The current snapshot comes from Flask." icon={Zap} /></Card>}

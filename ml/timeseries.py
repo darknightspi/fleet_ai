@@ -48,7 +48,7 @@ SCENARIO_CONFIGS = {
 
 def generate_fleet_timeseries(
     scenario: str = "heat_dissipation",
-    vehicle_id: str = "FL-101",
+    vehicle_id: str = "001",
     predictor: Optional[FleetGuardPredictor] = None,
 ) -> Dict[str, Any]:
     """

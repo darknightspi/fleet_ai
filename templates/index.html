@@ -273,7 +273,7 @@
         <div class="card-header">
           <div>
             <h2 class="card-title">Commercial Fleet Real-Time Health Monitor</h2>
-            <p class="card-subtitle">Active simulated vehicle telemetry streams with instant AI4I diagnostic inference</p>
+            <p class="card-subtitle">Simulated demonstration units and registered hardware telemetry, when available</p>
           </div>
           <div class="fleet-filter-group">
             <button class="filter-btn active" data-filter="all">All (8)</button>
@@ -283,6 +283,7 @@
           </div>
         </div>
 
+        <div class="fleet-connection-notice" id="fleetConnectionNotice" role="status">Loading backend fleet and hardware status...</div>
         <div class="fleet-grid" id="fleetGrid">
           <!-- Dynamically populated vehicle cards -->
         </div>
@@ -402,10 +403,10 @@
               <div class="ts-select-box">
                 <label for="tsVehicleSelect">Fleet Vehicle:</label>
                 <select id="tsVehicleSelect" class="custom-select">
-                  <option value="FL-101">FL-101 (Freightliner Cascadia)</option>
-                  <option value="FL-103">FL-103 (Volvo VNL 860)</option>
-                  <option value="FL-105">FL-105 (Mack Anthem)</option>
-                  <option value="FL-107">FL-107 (Western Star 49X)</option>
+                  <option value="001">001 (Freightliner Cascadia)</option>
+                  <option value="003">003 (Volvo VNL 860)</option>
+                  <option value="005">005 (Mack Anthem)</option>
+                  <option value="007">007 (Western Star 49X)</option>
                 </select>
               </div>
             </div>

@@ -69,6 +69,38 @@ export function summaryWithActions(snapshot: FleetSnapshot): FleetSnapshot["summ
   };
 }
 
+export function hardwareConnectionCounts(snapshot: Pick<FleetSnapshot, "mode" | "vehicles">): {
+  connected: number;
+  registered: number;
+  simulated: number;
+  stale: number;
+  disconnected: number;
+} {
+  const simulated = snapshot.vehicles.filter((vehicle) => vehicle.source === "Simulated").length;
+  if (snapshot.mode === "mock") return { connected: 0, registered: 0, simulated, stale: 0, disconnected: 0 };
+  const hardware = snapshot.vehicles.filter((vehicle) => vehicle.source === "Hardware");
+  return {
+    connected: hardware.filter((vehicle) => vehicle.connectivity === "Online").length,
+    registered: hardware.length,
+    simulated,
+    stale: hardware.filter((vehicle) => vehicle.connectivity === "Stale").length,
+    disconnected: hardware.filter((vehicle) => vehicle.connectivity === "Offline").length,
+  };
+}
+
+export function hardwareConnectionNotice(snapshot: Pick<FleetSnapshot, "mode" | "vehicles">): string {
+  const counts = hardwareConnectionCounts(snapshot);
+  const stateDetails = [
+    counts.disconnected > 0 ? `${counts.disconnected} registered unit${counts.disconnected === 1 ? " is" : "s are"} disconnected` : "",
+    counts.stale > 0 ? `${counts.stale} registered unit${counts.stale === 1 ? " has" : "s have"} stale telemetry` : "",
+  ].filter(Boolean);
+  const suffix = stateDetails.length ? ` ${stateDetails.join("; ")}.` : "";
+  if (counts.connected > 0) {
+    return `Hardware Connected: ${counts.connected} real RC ${counts.connected === 1 ? "unit" : "units"} connected. Simulated demonstration units remain available.${suffix}`;
+  }
+  return `Demo Mode: No physical RC units connected. The displayed fleet contains ${counts.simulated > 0 ? "simulated demonstration data" : "no simulated units"}.${suffix}`;
+}
+
 export function csvForVehicles(vehicles: Vehicle[]): string {
   const headers = ["Vehicle ID", "Vehicle type", "Source", "Connectivity", "Operational state", "Risk band", "Risk score", "Last seen"];
   const rows = vehicles.map((vehicle) => [

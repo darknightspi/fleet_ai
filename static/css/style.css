@@ -886,6 +886,21 @@ input[type="range"]::-webkit-slider-thumb:hover {
   gap: 1.1rem;
 }
 
+.fleet-connection-notice {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: var(--radius-lg);
+  background: rgba(56, 189, 248, 0.08);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.fleet-connection-notice.is-connected {
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(52, 211, 153, 0.08);
+}
+
 .vehicle-card {
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid var(--border-subtle);

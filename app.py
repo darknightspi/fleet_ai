@@ -23,6 +23,7 @@ from ml.config import (
     REPO_ROOT,
 )
 from ml.inference import FleetGuardPredictor
+from fleet_registry import hardware_registry
 
 app = Flask(
     __name__,
@@ -36,7 +37,8 @@ predictor = FleetGuardPredictor(model_path=MODEL_PATH)
 # Simulated Fleet Data
 SIMULATED_FLEET = [
     {
-        "id": "FL-101",
+        "id": "001",
+        "source": "Simulated",
         "model": "Freightliner Cascadia",
         "duty": "heavy",
         "ambient_temp_c": 26.0,
@@ -46,7 +48,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 50,
     },
     {
-        "id": "FL-102",
+        "id": "002",
+        "source": "Simulated",
         "model": "Kenworth T680",
         "duty": "medium",
         "ambient_temp_c": 28.5,
@@ -56,7 +59,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 90,
     },
     {
-        "id": "FL-103",
+        "id": "003",
+        "source": "Simulated",
         "model": "Volvo VNL 860",
         "duty": "heavy",
         "ambient_temp_c": 31.0,
@@ -66,7 +70,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 120,
     },
     {
-        "id": "FL-104",
+        "id": "004",
+        "source": "Simulated",
         "model": "Peterbilt 579",
         "duty": "medium",
         "ambient_temp_c": 25.0,
@@ -76,7 +81,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 30,
     },
     {
-        "id": "FL-105",
+        "id": "005",
+        "source": "Simulated",
         "model": "Mack Anthem",
         "duty": "heavy",
         "ambient_temp_c": 27.0,
@@ -86,7 +92,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 160,
     },
     {
-        "id": "FL-106",
+        "id": "006",
+        "source": "Simulated",
         "model": "International LT",
         "duty": "light",
         "ambient_temp_c": 24.5,
@@ -96,7 +103,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 75,
     },
     {
-        "id": "FL-107",
+        "id": "007",
+        "source": "Simulated",
         "model": "Western Star 49X",
         "duty": "heavy",
         "ambient_temp_c": 28.0,
@@ -106,7 +114,8 @@ SIMULATED_FLEET = [
         "operating_wear_min": 220,
     },
     {
-        "id": "FL-108",
+        "id": "008",
+        "source": "Simulated",
         "model": "Kenworth W990",
         "duty": "medium",
         "ambient_temp_c": 25.5,
@@ -151,7 +160,7 @@ def predict():
 
 @app.route("/api/fleet", methods=["GET"])
 def get_fleet():
-    """Return simulated fleet with real-time risk predictions."""
+    """Return seeded demonstration units together with registered hardware units."""
     fleet_with_preds = []
     for truck in SIMULATED_FLEET:
         pred = predictor.predict(truck, is_vehicle_telemetry=True)
@@ -160,8 +169,88 @@ def get_fleet():
         truck_entry["failure_probability"] = pred["failure_probability"]
         truck_entry["risk_level"] = pred["risk_level"]
         truck_entry["model_in_range"] = pred["model_in_range"]
+        truck_entry.update(connectivity="Unknown", last_seen=None)
         fleet_with_preds.append(truck_entry)
+
+    for unit in hardware_registry.list_units():
+        telemetry = unit["telemetry"]
+        has_model_inputs = all(
+            key in telemetry
+            for key in (
+                "ambient_temp_c",
+                "coolant_temp_c",
+                "engine_rpm",
+                "engine_torque_nm",
+                "operating_wear_min",
+            )
+        )
+        if has_model_inputs:
+            prediction = predictor.predict(
+                {
+                    **telemetry,
+                    "vehicle_duty_type": telemetry.get("vehicle_duty_type", "M"),
+                },
+                is_vehicle_telemetry=True,
+            )
+        else:
+            prediction = {
+                "failure_predicted": None,
+                "failure_probability": None,
+                "risk_level": "UNKNOWN",
+                "model_in_range": None,
+            }
+        fleet_with_preds.append(
+            {
+                "id": unit["id"],
+                "device_id": unit["device_id"],
+                "model": unit["model"],
+                "source": unit["source"],
+                "connectivity": unit["connectivity"],
+                "last_seen": unit["last_seen"],
+                "telemetry": telemetry,
+                "telemetry_seq": unit["telemetry_seq"],
+                "duty": telemetry.get("vehicle_duty_type", "unknown"),
+                "ambient_temp_c": telemetry.get("ambient_temp_c"),
+                "coolant_temp_c": telemetry.get("coolant_temp_c"),
+                "engine_rpm": telemetry.get("engine_rpm"),
+                "engine_torque_nm": telemetry.get("engine_torque_nm"),
+                "operating_wear_min": telemetry.get("operating_wear_min"),
+                **prediction,
+            }
+        )
     return jsonify(fleet_with_preds)
+
+
+@app.route("/api/hardware/telemetry", methods=["POST"])
+def ingest_hardware_telemetry():
+    """Accept telemetry from an adapter after it has established a device session."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object."}), 400
+    try:
+        unit, is_new = hardware_registry.ingest(
+            device_id=data.get("device_id"),
+            telemetry=data.get("telemetry"),
+            model=data.get("model", "RC car"),
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    return jsonify({"unit": unit, "registered": is_new}), 201 if is_new else 200
+
+
+@app.route("/api/hardware/disconnect", methods=["POST"])
+def disconnect_hardware_unit():
+    """Mark a registered device offline while retaining its latest reading."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object."}), 400
+    try:
+        unit = hardware_registry.disconnect(data.get("device_id"))
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    except KeyError as error:
+        return jsonify({"error": str(error).strip("'")}), 404
+    return jsonify({"unit": unit})
 
 
 @app.route("/api/metrics", methods=["GET"])
@@ -194,7 +283,7 @@ from ml.timeseries import generate_fleet_timeseries
 def get_timeseries():
     """Return 60-minute time-series telemetry and failure progression for a vehicle/scenario."""
     scenario = request.args.get("scenario", "heat_dissipation")
-    vehicle_id = request.args.get("vehicle_id", "FL-101")
+    vehicle_id = request.args.get("vehicle_id", "001")
     force_mock = request.args.get("mock", "false").lower() == "true"
 
     active_predictor = FleetGuardPredictor(force_mock_mode=True) if force_mock else predictor

@@ -77,12 +77,20 @@ npm run dev
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/api/health` | Backend and model readiness |
-| `GET` | `/api/fleet` | Seeded fleet and per-vehicle predictions |
+| `GET` | `/api/fleet` | Eight simulated units (`001`–`008`) and any registered hardware units |
 | `POST` | `/api/predict` | Predict from a supplied telemetry or AI4I feature payload |
 | `GET` | `/api/metrics` | Existing evaluation metrics and feature importances |
 | `GET` | `/api/timeseries` | Generated 60-minute scenario data with per-step predictions |
+| `POST` | `/api/hardware/telemetry` | Register/update a device after an external transport has established a real session |
+| `POST` | `/api/hardware/disconnect` | Mark a registered device offline while retaining its latest telemetry |
 
-The React adapter currently calls `/api/health` and `/api/fleet`. It shows backend predictions and model input values. The current backend does not supply historical readings, GPS, fuel volume, alert records, or work orders; those dashboard areas therefore show unavailable or empty states. The frontend does not fabricate those values. The seeded fleet records are simulated inputs, and the AI4I industrial model is not validated for predicting truck failures.
+The eight Flask demonstration units use IDs `001`–`008`. The local React simulator also uses those IDs for its eight separate, browser-generated demo units. They are simulated and do not represent physical RC cars.
+
+The hardware telemetry endpoint accepts JSON containing a stable `device_id`, optional `model`, and a `telemetry` object with one or more supported readings. A transport adapter must call it only after a real device identification/session handshake and receipt of valid telemetry; a connection attempt alone does not register a unit. The first accepted telemetry assigns the next free ID starting at `101`; repeated messages for that device update the same unit. If no new telemetry arrives for 60 seconds, the unit is marked `Stale`; the disconnect endpoint marks it `Offline` immediately without deleting it. Compatible complete model inputs are passed through the existing predictor; incomplete telemetry returns no prediction rather than fabricated/defaulted values.
+
+Hardware registrations currently live only in backend process memory. They survive disconnects during that process lifetime, but are lost on restart; IDs may then be reused because no persistence layer exists. This is an integration boundary, not Bluetooth/ESP32 support: the repository does not implement the hardware transport, and no real units are registered unless a transport adapter submits telemetry. `/api/fleet` combines these records with the eight simulated units, while the dashboard polls the endpoint every 30 seconds. The React adapter shows the latest hardware reading, not a historical hardware feed. The current API still does not supply GPS history, fuel volume, alert records, or work orders. The AI4I industrial model is not validated for predicting truck failures.
+
+The dashboard sidebar reports Flask connectivity independently from the vehicle data source. Fleet API records can identify their source as `Hardware`, `Simulated`, or `Replay`; missing source values are treated as simulated. Include the correct source with real RC telemetry when wiring a vehicle feed.
 
 ## Tests and production build
 
